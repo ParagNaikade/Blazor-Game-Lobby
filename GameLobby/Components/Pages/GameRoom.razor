@@ -1,0 +1,90 @@
+@using GameLobby.Models
+@using Microsoft.AspNetCore.SignalR.Client  
+
+@page "/game/{RoomId}"  
+@inject NavigationManager NavigationManager  
+@inject IJSRuntime JSRuntime  
+@implements IAsyncDisposable  
+
+<h3>Game Room: @RoomId</h3>  
+
+@if (!IsConnected)  
+{  
+    <p>Connecting...</p>  
+}  
+else if (!IsOpponentJoined)  
+{  
+    <p>Waiting for opponent to join...</p>  
+}  
+else if (!HasPlayerMoved)  
+{  
+    <p>Choose your move:</p>  
+    <button @onclick="() => MakeMove(Move.Rock)">🪨 Rock</button>  
+    <button @onclick="() => MakeMove(Move.Paper)">📄 Paper</button>  
+    <button @onclick="() => MakeMove(Move.Scissors)">✂️ Scissors</button>  
+}  
+else  
+{  
+    <p>Waiting for opponent's move...</p>  
+}  
+
+@if (WinnerMessage != null)  
+{  
+    <h4>@WinnerMessage</h4>  
+    <button @onclick="ResetGame">Play Again</button>  
+}  
+
+@code {  
+    [Parameter] public string RoomId { get; set; }  
+
+    private HubConnection _hubConnection;  
+    private bool IsConnected;  
+    private bool IsOpponentJoined;  
+    private bool HasPlayerMoved;  
+    private string WinnerMessage;  
+
+    protected override async Task OnInitializedAsync()  
+    {  
+        _hubConnection = new HubConnectionBuilder()  
+            .WithUrl(NavigationManager.ToAbsoluteUri("/gamehub"))  
+            .Build();  
+
+        _hubConnection.On("PlayerJoined", () =>  
+        {  
+            IsOpponentJoined = true;  
+            StateHasChanged();  
+        });  
+
+        _hubConnection.On<string>("ShowResult", (msg) =>  
+        {  
+            WinnerMessage = msg;  
+            StateHasChanged();  
+        });  
+
+        await _hubConnection.StartAsync();  
+        IsConnected = true;  
+
+        await _hubConnection.SendAsync("JoinRoom", RoomId);  
+    }  
+
+    private async Task MakeMove(Move move)  
+    {  
+        HasPlayerMoved = true;  
+        await _hubConnection.SendAsync("MakeMove", RoomId, move);  
+    }  
+
+    private async Task ResetGame()  
+    {  
+        WinnerMessage = null;  
+        HasPlayerMoved = false;  
+        await _hubConnection.SendAsync("Reset", RoomId);  
+    }  
+
+    public async ValueTask DisposeAsync()  
+    {  
+        if (_hubConnection != null)  
+        {  
+            await _hubConnection.DisposeAsync();  
+        }  
+    }  
+}
