@@ -15,6 +15,7 @@ WORKDIR /src
 COPY ["RockPaperScissorsGame/RockPaperScissorsGame.csproj", "RockPaperScissorsGame/"]
 COPY ["RockPaperScissorsGame.Client/RockPaperScissorsGame.Client.csproj", "RockPaperScissorsGame.Client/"]
 COPY ["RockPaperScissorsGame.Shared/RockPaperScissorsGame.Shared.csproj", "RockPaperScissorsGame.Shared/"]
+
 RUN dotnet restore "./RockPaperScissorsGame/RockPaperScissorsGame.csproj"
 COPY . .
 WORKDIR "/src/RockPaperScissorsGame"
@@ -29,4 +30,4 @@ RUN dotnet publish "./RockPaperScissorsGame.csproj" -c $BUILD_CONFIGURATION -o /
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "RockPaperScissorsGame.dll"]
+ENTRYPOINT ["dotnet", "RockPaperScissorsGame.dll", "--urls", "http://0.0.0.0:8080"]
