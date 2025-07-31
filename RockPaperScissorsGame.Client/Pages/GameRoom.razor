@@ -1,0 +1,110 @@
+@page "/game/{RoomId}"
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.AspNetCore.WebUtilities
+@using RockPaperScissorsGame.Models
+@rendermode InteractiveWebAssembly
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<h2 class="text-xl font-bold mb-4">Game Room: @RoomId</h2>
+
+@if (!IsConnected)
+{
+    <p>Connecting...</p>
+}
+else if (!IsOpponentJoined)
+{
+    <p>Waiting for opponent to join...</p>
+}
+else if (!HasPlayerMoved)
+{
+    <div class="text-center space-y-2">
+        <p class="text-lg font-medium">Choose your move:</p>
+        <button class="btn-move" @onclick="() => MakeMove(Move.Rock)">🪨 Rock</button>
+        <button class="btn-move" @onclick="() => MakeMove(Move.Paper)">📄 Paper</button>
+        <button class="btn-move" @onclick="() => MakeMove(Move.Scissors)">✂️ Scissors</button>
+    </div>
+}
+else
+{
+    <p>Waiting for opponent's move...</p>
+}
+
+@if (WinnerMessage != null)
+{
+    <div class="mt-4">
+        <h3 class="text-2xl font-bold text-green-600">@WinnerMessage</h3>
+        <button class="mt-2 px-4 py-2 bg-blue-500 text-white rounded" @onclick="ResetGame">Play Again</button>
+    </div>
+}
+
+@code {
+    [Parameter] public string RoomId { get; set; }
+    private string PlayerName;
+    private string PlayerAvatar;
+
+    private HubConnection _hubConnection;
+    private bool IsConnected;
+    private bool IsOpponentJoined;
+    private bool HasPlayerMoved;
+    private string WinnerMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        PlayerName = query["name"];
+        PlayerAvatar = query["avatar"];
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _hubConnection = new HubConnectionBuilder()
+                .WithUrl(NavigationManager.ToAbsoluteUri("/gamehub"))
+                .Build();
+
+            _hubConnection.On("PlayerJoined", async () =>
+            {
+                IsOpponentJoined = true;
+                await JSRuntime.InvokeVoidAsync("playJoinSound");
+                await InvokeAsync(StateHasChanged);
+            });
+
+            _hubConnection.On<string>("ShowResult", async (msg) =>
+            {
+                WinnerMessage = msg;
+                await InvokeAsync(StateHasChanged);
+            });
+
+            await _hubConnection.StartAsync();
+            IsConnected = true;
+
+            await _hubConnection.SendAsync("JoinRoom", RoomId);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task MakeMove(Move move)
+    {
+        HasPlayerMoved = true;
+        await _hubConnection.SendAsync("MakeMove", RoomId, move);
+    }
+
+    private async Task ResetGame()
+    {
+        WinnerMessage = null;
+        HasPlayerMoved = false;
+        await _hubConnection.SendAsync("Reset", RoomId);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+}

@@ -1,0 +1,103 @@
+﻿@page "/lobby"
+@rendermode InteractiveWebAssembly
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<h1 class="text-center my-4 display-5">🎮 Rock-Paper-Scissors Lobby</h1>
+
+<div class="container">
+    <div class="card shadow-lg mx-auto p-4" style="max-width: 500px;">
+        <div class="mb-3">
+            <label class="form-label fw-bold">👤 Name</label>
+            <input @bind="PlayerName" class="form-control" placeholder="Enter your name..." />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold">🎭 Choose Avatar</label>
+            <div class="d-flex gap-2 fs-3">
+                @foreach (var avatar in Avatars)
+                {
+                    <button type="button"
+                            class="@GetAvatarClass(avatar)"
+                            @onclick="() => SelectAvatar(avatar)">
+                        @avatar
+                    </button>
+                }
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold">🏠 Room ID</label>
+            <input @bind="RoomId" class="form-control" placeholder="Enter room ID..." />
+        </div>
+
+        <button class="btn btn-primary w-100 fw-semibold" @onclick="JoinRoom">
+            🚀 Join Game
+        </button>
+
+        @if (IsJoining)
+        {
+            <div class="text-center text-muted mt-3">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                Joining room...
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private string PlayerName = "";
+    private string SelectedAvatar = "";
+    private string RoomId = "";
+    private bool IsJoining = false;
+    private readonly string[] Avatars = { "🐱", "🐶", "🦊", "🐸", "🐵", "🐧" };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var data = await JSRuntime.InvokeAsync<PlayerData>("getPlayerData");
+            if (data is not null)
+            {
+                PlayerName = data.Name;
+                SelectedAvatar = data.Avatar;
+            }
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private string GetAvatarClass(string avatar)
+    {
+        return avatar == SelectedAvatar
+            ? "btn btn-outline-primary active"
+            : "btn btn-outline-secondary";
+    }
+
+    private void SelectAvatar(string avatar)
+    {
+        SelectedAvatar = avatar;
+    }
+
+    private async Task JoinRoom()
+    {
+        if (string.IsNullOrWhiteSpace(PlayerName) || string.IsNullOrWhiteSpace(SelectedAvatar) || string.IsNullOrWhiteSpace(RoomId))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Please complete all fields.");
+            return;
+        }
+
+        IsJoining = true;
+
+        await JSRuntime.InvokeVoidAsync("savePlayerData", new { name = PlayerName, avatar = SelectedAvatar });
+        await JSRuntime.InvokeVoidAsync("playJoinSound");
+
+        NavigationManager.NavigateTo($"/game/{RoomId}?name={Uri.EscapeDataString(PlayerName)}&avatar={Uri.EscapeDataString(SelectedAvatar)}");
+    }
+
+    public class PlayerData
+    {
+        public string Name { get; set; }
+        public string Avatar { get; set; }
+    }
+}
