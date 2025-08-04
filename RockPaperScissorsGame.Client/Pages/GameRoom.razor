@@ -9,15 +9,27 @@
 
 <h2 class="text-xl font-bold mb-4">Game Room: @RoomId</h2>
 
-@if (!IsConnected)
+@if (!_isConnected)
 {
     <p>Connecting...</p>
 }
-else if (!IsOpponentJoined)
+else if (_isRoomFull)
+{
+    <p>Room is full</p>
+}
+else if (_opponentLeft)
+{
+    <p>Opponent has left the game.</p>
+}
+else if (string.IsNullOrWhiteSpace(_playerName) || string.IsNullOrWhiteSpace(_playerAvatar))
+{
+    <p>Please provide your name and avatar in the lobby.</p>
+}
+else if (!_isOpponentJoined)
 {
     <p>Waiting for opponent to join...</p>
 }
-else if (!HasPlayerMoved)
+else if (!_hasPlayerMoved)
 {
     <div class="text-center space-y-2">
         <p class="text-lg font-medium">Choose your move:</p>
@@ -26,36 +38,38 @@ else if (!HasPlayerMoved)
         <button class="btn-move" @onclick="() => MakeMove(Move.Scissors)">✂️ Scissors</button>
     </div>
 }
+else if (_winnerMessage != null)
+{
+    <div class="mt-4">
+        <h3 class="text-2xl font-bold text-green-600">@_winnerMessage</h3>
+        <button class="btn-primary mt-2 px-4 py-2 bg-blue-500 text-white rounded" @onclick="ResetGame">Play Again</button>
+    </div>
+}
 else
 {
     <p>Waiting for opponent's move...</p>
 }
 
-@if (WinnerMessage != null)
-{
-    <div class="mt-4">
-        <h3 class="text-2xl font-bold text-green-600">@WinnerMessage</h3>
-        <button class="mt-2 px-4 py-2 bg-blue-500 text-white rounded" @onclick="ResetGame">Play Again</button>
-    </div>
-}
-
 @code {
-    [Parameter] public string RoomId { get; set; }
-    private string PlayerName;
-    private string PlayerAvatar;
+    [Parameter] public string RoomId { get; set; } = string.Empty;
 
-    private HubConnection _hubConnection;
-    private bool IsConnected;
-    private bool IsOpponentJoined;
-    private bool HasPlayerMoved;
-    private string WinnerMessage;
+    private string _playerName = string.Empty;
+    private string _playerAvatar = string.Empty;
+
+    private HubConnection? _hubConnection;
+    private bool _isConnected;
+    private bool _isOpponentJoined;
+    private bool _isRoomFull;
+    private bool _opponentLeft;
+    private bool _hasPlayerMoved;
+    private string? _winnerMessage;
 
     protected override async Task OnInitializedAsync()
     {
         var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
         var query = QueryHelpers.ParseQuery(uri.Query);
-        PlayerName = query["name"];
-        PlayerAvatar = query["avatar"];
+        _playerName = query["name"];
+        _playerAvatar = query["avatar"];
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -68,19 +82,32 @@ else
 
             _hubConnection.On("PlayerJoined", async () =>
             {
-                IsOpponentJoined = true;
+                _isOpponentJoined = true;
                 await JSRuntime.InvokeVoidAsync("playJoinSound");
                 await InvokeAsync(StateHasChanged);
             });
 
             _hubConnection.On<string>("ShowResult", async (msg) =>
             {
-                WinnerMessage = msg;
+                _winnerMessage = msg;
+                await InvokeAsync(StateHasChanged);
+            });
+
+            _hubConnection.On("RoomFull", async () =>
+            {
+                _isRoomFull = true;
+                await InvokeAsync(StateHasChanged);
+                await JSRuntime.InvokeVoidAsync("playGameOverSound");
+            });
+
+            _hubConnection.On<string>("OpponentLeft", async (msg) =>
+            {
+                _opponentLeft = true;
                 await InvokeAsync(StateHasChanged);
             });
 
             await _hubConnection.StartAsync();
-            IsConnected = true;
+            _isConnected = true;
 
             await _hubConnection.SendAsync("JoinRoom", RoomId);
             await InvokeAsync(StateHasChanged);
@@ -89,14 +116,14 @@ else
 
     private async Task MakeMove(Move move)
     {
-        HasPlayerMoved = true;
+        _hasPlayerMoved = true;
         await _hubConnection.SendAsync("MakeMove", RoomId, move);
     }
 
     private async Task ResetGame()
     {
-        WinnerMessage = null;
-        HasPlayerMoved = false;
+        _winnerMessage = null;
+        _hasPlayerMoved = false;
         await _hubConnection.SendAsync("Reset", RoomId);
     }
 

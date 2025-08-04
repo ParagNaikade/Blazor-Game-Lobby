@@ -10,6 +10,7 @@ namespace BlazorApp2.Hubs
         public async Task JoinRoom(string roomId)
         {
             string opponentId = null;
+            bool isRoomFull = false;
 
             await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
 
@@ -25,6 +26,15 @@ namespace BlazorApp2.Hubs
                     Rooms[roomId].Player2 = Context.ConnectionId;
                     opponentId = Rooms[roomId].Player1;
                 }
+                else
+                {
+                    isRoomFull = true;
+                }
+            }
+
+            if (isRoomFull)
+            {
+                await Clients.Client(Context.ConnectionId).SendAsync("RoomFull");
             }
 
             if (!string.IsNullOrWhiteSpace(opponentId))
@@ -68,7 +78,39 @@ namespace BlazorApp2.Hubs
 
         public override async Task OnDisconnectedAsync(Exception exception)
         {
-            // Clean up could be handled here
+            string roomId = null;
+            string opponentId = null;
+
+            lock (Rooms)
+            {
+                foreach (var kvp in Rooms)
+                {
+                    var room = kvp.Value;
+                    if (room.Player1 == Context.ConnectionId)
+                    {
+                        room.Player1 = null;
+                        room.Move1 = Move.None;
+                        roomId = kvp.Key;
+                        opponentId = room.Player2;
+                        break;
+                    }
+                    else if (room.Player2 == Context.ConnectionId)
+                    {
+                        room.Player2 = null;
+                        room.Move2 = Move.None;
+                        roomId = kvp.Key;
+                        opponentId = room.Player1;
+                        break;
+                    }
+                }
+            }
+
+            // Notify the opponent if they are still connected
+            if (!string.IsNullOrWhiteSpace(roomId) && !string.IsNullOrWhiteSpace(opponentId))
+            {
+                await Clients.Client(opponentId).SendAsync("OpponentLeft");
+            }
+
             await base.OnDisconnectedAsync(exception);
         }
     }
