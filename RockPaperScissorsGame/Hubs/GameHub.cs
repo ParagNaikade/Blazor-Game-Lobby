@@ -66,14 +66,12 @@ namespace BlazorApp2.Hubs
             }
         }
 
-        public Task Reset(string roomId)
+        public async Task Reset(string roomId)
         {
             if (Rooms.TryGetValue(roomId, out var room))
             {
-                room.Reset();
+                await Clients.Groups(roomId).SendAsync("ResetGame");
             }
-
-            return Task.CompletedTask;
         }
 
         public override async Task OnDisconnectedAsync(Exception exception)
