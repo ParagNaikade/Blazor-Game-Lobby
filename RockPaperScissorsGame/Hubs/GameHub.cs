@@ -7,7 +7,7 @@ namespace BlazorApp2.Hubs
     {
         private static readonly Dictionary<string, GameRoom> Rooms = [];
 
-        public async Task JoinRoom(string roomId)
+        public async Task JoinRoom(string roomId, string playerName)
         {
             string opponentId = null;
             bool isRoomFull = false;
@@ -19,12 +19,14 @@ namespace BlazorApp2.Hubs
                 if (!Rooms.ContainsKey(roomId))
                 {
                     Rooms[roomId] = new GameRoom(roomId);
-                    Rooms[roomId].Player1 = Context.ConnectionId;
+                    Rooms[roomId].Player1Id = Context.ConnectionId;
+                    Rooms[roomId].Player1Name = playerName;
                 }
-                else if (string.IsNullOrWhiteSpace(Rooms[roomId].Player2))
+                else if (string.IsNullOrWhiteSpace(Rooms[roomId].Player2Id))
                 {
-                    Rooms[roomId].Player2 = Context.ConnectionId;
-                    opponentId = Rooms[roomId].Player1;
+                    Rooms[roomId].Player2Id = Context.ConnectionId;
+                    opponentId = Rooms[roomId].Player1Id;
+                    Rooms[roomId].Player2Name = playerName;
                 }
                 else
                 {
@@ -48,20 +50,34 @@ namespace BlazorApp2.Hubs
             if (!Rooms.ContainsKey(roomId)) return;
 
             var room = Rooms[roomId];
-            if (Context.ConnectionId == room.Player1)
+            if (Context.ConnectionId == room.Player1Id)
             {
                 room.Move1 = move;
             }
 
-            if (Context.ConnectionId == room.Player2)
+            if (Context.ConnectionId == room.Player2Id)
             {
                 room.Move2 = move;
             }
 
             if (room.Move1 != Move.None && room.Move2 != Move.None)
             {
-                var result = GameLogic.DetermineWinner(room.Move1, room.Move2);
-                await Clients.Group(roomId).SendAsync("ShowResult", result);
+                var result = GameLogic.GetWinnerNumber(room.Move1, room.Move2);
+                string? resultMessage;
+                if (result == null)
+                {
+                    resultMessage = "It's a tie";
+                }
+                else if (result == 1)
+                {
+                    resultMessage = $"{room.Player1Name} wins!";
+                }
+                else
+                {
+                    resultMessage = $"{room.Player2Name} wins!";
+                }
+
+                await Clients.Group(roomId).SendAsync("ShowResult", resultMessage);
                 room.Reset();
             }
         }
@@ -84,20 +100,20 @@ namespace BlazorApp2.Hubs
                 foreach (var kvp in Rooms)
                 {
                     var room = kvp.Value;
-                    if (room.Player1 == Context.ConnectionId)
+                    if (room.Player1Id == Context.ConnectionId)
                     {
-                        room.Player1 = null;
+                        room.Player1Id = null;
                         room.Move1 = Move.None;
                         roomId = kvp.Key;
-                        opponentId = room.Player2;
+                        opponentId = room.Player2Id;
                         break;
                     }
-                    else if (room.Player2 == Context.ConnectionId)
+                    else if (room.Player2Id == Context.ConnectionId)
                     {
-                        room.Player2 = null;
+                        room.Player2Id = null;
                         room.Move2 = Move.None;
                         roomId = kvp.Key;
-                        opponentId = room.Player1;
+                        opponentId = room.Player1Id;
                         break;
                     }
                 }

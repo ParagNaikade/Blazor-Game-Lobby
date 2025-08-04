@@ -6,9 +6,13 @@
     {
         public string RoomId { get; } = roomId;
 
-        public string Player1 { get; set; } = string.Empty;
+        public string Player1Id { get; set; } = string.Empty;
 
-        public string Player2 { get; set; } = string.Empty;
+        public string Player2Id { get; set; } = string.Empty;
+
+        public string Player1Name { get; set; } = string.Empty;
+
+        public string Player2Name { get; set; } = string.Empty;
 
         public Move Move1 { get; set; } = Move.None;
 
@@ -22,21 +26,21 @@
 
     public static class GameLogic
     {
-        public static string DetermineWinner(Move m1, Move m2)
+        public static int? GetWinnerNumber(Move m1, Move m2)
         {
             if (m1 == m2)
             {
-                return "It's a tie!";
+                return null;
             }
 
             if (m1 == Move.Rock && m2 == Move.Scissors ||
                 m1 == Move.Paper && m2 == Move.Rock ||
                 m1 == Move.Scissors && m2 == Move.Paper)
             {
-                return "Player 1 wins!";
+                return 1;
             }
 
-            return "Player 2 wins!";
+            return 2;
         }
     }
 }

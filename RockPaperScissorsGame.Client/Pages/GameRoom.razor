@@ -7,48 +7,76 @@
 @inject IJSRuntime JSRuntime
 @implements IAsyncDisposable
 
-<h2 class="text-xl font-bold mb-4">Game Room: @RoomId</h2>
+<div class="container py-5">
+    <div class="row">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-lg rounded-4">
+                <div class="card-body">
 
-@if (!_isConnected)
-{
-    <p>Connecting...</p>
-}
-else if (_isRoomFull)
-{
-    <p>Room is full</p>
-}
-else if (_opponentLeft)
-{
-    <p>Opponent has left the game.</p>
-}
-else if (string.IsNullOrWhiteSpace(_playerName) || string.IsNullOrWhiteSpace(_playerAvatar))
-{
-    <p>Please provide your name and avatar in the lobby.</p>
-}
-else if (!_isOpponentJoined)
-{
-    <p>Waiting for opponent to join...</p>
-}
-else if (!_hasPlayerMoved)
-{
-    <div class="text-center space-y-2">
-        <p class="text-lg font-medium">Choose your move:</p>
-        <button class="btn-move" @onclick="() => MakeMove(Move.Rock)">🪨 Rock</button>
-        <button class="btn-move" @onclick="() => MakeMove(Move.Paper)">📄 Paper</button>
-        <button class="btn-move" @onclick="() => MakeMove(Move.Scissors)">✂️ Scissors</button>
+                    <div class="d-flex align-items-center mb-4 p-3 bg-light rounded-3 shadow-sm">
+                        <span class="fs-1 me-3" style="width: 3rem; height: 3rem; display: flex; align-items: center; justify-content: center;">
+                            @_playerAvatar
+                        </span>
+                        <div>
+                            <div class="fw-bold text-primary fs-4">@_playerName</div>
+                            <div class="text-muted small">You</div>
+                        </div>
+                    </div>
+
+                    <h2 class="card-title text-center mb-4 text-primary fw-bold">Game Room: @RoomId</h2>
+
+                    @if (!_isConnected)
+                    {
+                        <div class="d-flex flex-column align-items-center py-4">
+                            <div class="spinner-border text-primary mb-3" role="status"></div>
+                            <p class="text-muted fs-5">Connecting...</p>
+                        </div>
+                    }
+                    else if (_isRoomFull)
+                    {
+                        <div class="alert alert-danger text-center">Room is full</div>
+                    }
+                    else if (_opponentLeft)
+                    {
+                        <div class="alert alert-warning text-center">Opponent has left the game.</div>
+                    }
+                    else if (string.IsNullOrWhiteSpace(_playerName) || string.IsNullOrWhiteSpace(_playerAvatar))
+                    {
+                        <div class="alert alert-info text-center">Please provide your name and avatar in the lobby.</div>
+                    }
+                    else if (!_isOpponentJoined)
+                    {
+                        <div class="d-flex flex-column align-items-center py-4">
+                            <div class="text-muted fs-5 mb-2">Waiting for opponent to join...</div>
+                        </div>
+                    }
+                    else if (!_hasPlayerMoved)
+                    {
+                        <div class="text-center mb-3">
+                            <p class="fs-5 fw-semibold mb-3">Choose your move:</p>
+                            <div class="d-flex justify-content-center gap-3 flex-wrap">
+                                <button class="btn btn-lg btn-outline-primary px-4" @onclick="() => MakeMove(Move.Rock)">🪨 Rock</button>
+                                <button class="btn btn-lg btn-outline-success px-4" @onclick="() => MakeMove(Move.Paper)">📄 Paper</button>
+                                <button class="btn btn-lg btn-outline-danger px-4" @onclick="() => MakeMove(Move.Scissors)">✂️ Scissors</button>
+                            </div>
+                        </div>
+                    }
+                    else if (_winnerMessage != null)
+                    {
+                        <div class="text-center mt-4">
+                            <h3 class="fw-bold text-success mb-3">@_winnerMessage</h3>
+                            <button class="btn btn-primary btn-lg" @onclick="ResetGame">Play Again</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-4">Waiting for opponent's move...</div>
+                    }
+                </div>
+            </div>
+        </div>
     </div>
-}
-else if (_winnerMessage != null)
-{
-    <div class="mt-4">
-        <h3 class="text-2xl font-bold text-green-600">@_winnerMessage</h3>
-        <button class="btn-primary mt-2 px-4 py-2 bg-blue-500 text-white rounded" @onclick="ResetGame">Play Again</button>
-    </div>
-}
-else
-{
-    <p>Waiting for opponent's move...</p>
-}
+</div>
 
 @code {
     [Parameter] public string RoomId { get; set; } = string.Empty;
@@ -115,7 +143,7 @@ else
             await _hubConnection.StartAsync();
             _isConnected = true;
 
-            await _hubConnection.SendAsync("JoinRoom", RoomId);
+            await _hubConnection.SendAsync("JoinRoom", RoomId, _playerName);
             await InvokeAsync(StateHasChanged);
         }
     }
